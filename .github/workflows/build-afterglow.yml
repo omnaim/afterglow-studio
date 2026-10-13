@@ -24,7 +24,6 @@ jobs:
         env:
           DOCKER_ACCESS_TOKEN: ${{ secrets.DOCKER_ACCESS_TOKEN }}
           CLOUD_BUILDER_NAME: ${{ vars.CLOUD_BUILDER_NAME }}
-          PUBLISH: ${{ inputs.publish }}
         run: |
           if [ -z "$DOCKER_ACCESS_TOKEN" ]; then
             echo "::error::Create the DOCKER_ACCESS_TOKEN Actions secret with a Docker Hub personal access token."
@@ -34,18 +33,17 @@ jobs:
             echo "::error::Set the CLOUD_BUILDER_NAME Actions variable to the Docker Build Cloud builder name."
             exit 1
           fi
-          if [ "$PUBLISH" = "true" ] && [ "$DOCKER_ACCESS_TOKEN" = "" ]; then exit 1; fi
 
       - name: Extract and validate source ZIP
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
-          candidates = list(Path(".").glob("AFTERGLOW_Studio_Two_Workflow.zip"))
-          if len(candidates) != 1:
+          archive = Path("AFTERGLOW_Studio_Two_Workflow.zip")
+          if not archive.is_file():
               raise SystemExit("Expected AFTERGLOW_Studio_Two_Workflow.zip in repository root.")
           dest = Path("buildsrc").resolve()
-          with zipfile.ZipFile(candidates[0]) as z:
+          with zipfile.ZipFile(archive) as z:
               if sum(item.file_size for item in z.infolist()) > 20 * 1024 * 1024:
                   raise SystemExit("Unexpected package size; stopping.")
               for item in z.infolist():
@@ -56,7 +54,6 @@ jobs:
           python3 buildsrc/afterglow-studio/runpod/validate_package.py
 
       - name: Sign in to Docker Hub and Docker Build Cloud
-        if: inputs.publish
         uses: docker/login-action@v4
         with:
           username: tylersabrin
